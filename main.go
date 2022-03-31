@@ -10,11 +10,13 @@ import (
 )
 
 type options struct {
-	columns []int
+	ignoreFirst bool
+	columns     []int
 }
 
 func main() {
-	var cFlag = flag.String("c", "", "columns to calculate delta on comma (separated and 0 indexed)")
+	var cFlag = flag.String("c", "", "columns to calculate delta on (comma separated and 0 indexed)")
+	var iFlag = flag.Bool("i", false, "when set ignores the first row")
 
 	flag.Parse()
 
@@ -23,9 +25,11 @@ func main() {
 		panic(err)
 	}
 
+	o := options{*iFlag, columns}
+
 	in := os.Stdin
 	out := os.Stdout
-	err = process(options{columns}, in, out)
+	err = process(o, in, out)
 	if err != nil {
 		panic(err)
 	}
@@ -46,16 +50,22 @@ func process(o options, r io.Reader, w io.Writer) error {
 		buffer[j] = "0"
 	}
 
+	row := -1
+
 	for {
-		record, err = csvReader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
+		row++
+		if record, err = csvReader.Read(); err != nil {
+			if err == io.EOF {
+				break
+			}
 			return err
 		}
-		newRecord, err = getRecord(o, buffer, record)
-		if err != nil {
+
+		if o.ignoreFirst && row == 0 {
+			continue
+		}
+
+		if newRecord, err = getRecord(o, buffer, record); err != nil {
 			return err
 		}
 
